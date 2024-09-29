@@ -16,8 +16,8 @@ START_DATE = '2023-09-29T00:00:00Z'  # Start date in RFC3339 forma
 
 
 def main():
-    """Shows basic usage of the Google Calendar API.
-    Prints the start and name of the next 10 events on the user's calendar.
+    """
+    Get all events from the primary calendar containing the target string
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
