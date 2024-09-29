@@ -11,13 +11,14 @@ from googleapiclient.errors import HttpError
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
-TARGET_STRING = "PA"
+TARGET_STRING = "InnoTA"
 START_DATE = '2023-09-29T00:00:00Z'  # Start date in RFC3339 forma
 
 
 def main():
     """
-    Get all events from the primary calendar containing the target string
+    Get all events from the primary calendar containing the target string.
+    Note that times are in timezone UTC.
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
