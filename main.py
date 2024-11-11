@@ -8,11 +8,13 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+### IMPORTANT: if the script is not working with an old token, delete the file token.json ###
+
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 TARGET_STRING = "InnoTA"
-START_DATE = '2023-09-29T00:00:00Z'  # Start date in RFC3339 forma
+START_DATE = '2023-09-29T00:00:00Z'  # Start date in RFC3339 format
 
 
 def main():
@@ -89,6 +91,20 @@ def main():
             f"Total time spent on past events containing '{TARGET_STRING}': {total_duration_spent}")
         print(
             f"Total time planned for future events containing '{TARGET_STRING}': {total_duration_planned}")
+        
+        # Calculate days since first to last event (that already happened)
+        first_timestamp = datetime.datetime.fromisoformat(filtered_events[0]["start"])
+        # get the last event that already happened
+        for event in filtered_events:
+            if datetime.datetime.fromisoformat(event["end"]) < datetime.datetime.now(datetime.timezone.utc):
+                last_timestamp = datetime.datetime.fromisoformat(event["end"])
+        days_since_first = (last_timestamp - first_timestamp).days
+        print(f"Days since first event: {days_since_first}")
+        # Average time spend per day
+        average_time_per_day = total_duration_spent / days_since_first
+        average_time_per_week = average_time_per_day * 7
+        print(f"Average time spent per day: {average_time_per_day}, per week: {average_time_per_week}")
+        
 
     except HttpError as error:
         print(f"An error occurred: {error}")
