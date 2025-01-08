@@ -92,9 +92,9 @@ def main():
                 # Create a pandas DataFrame
         df = pd.DataFrame(filtered_events)
         print(df)
-
+        
         print(
-            f"Total time spent on past events containing '{TARGET_STRING}': {total_duration_spent}")
+    f"Total time spent on past events containing '{TARGET_STRING}': {total_duration_spent} (as hours: {total_duration_spent.total_seconds() / 3600:.2f})")
         print(
             f"Total time planned for future events containing '{TARGET_STRING}': {total_duration_planned}")
         
