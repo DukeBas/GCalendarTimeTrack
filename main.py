@@ -62,7 +62,7 @@ def main():
         ).execute()
         events = events_result.get("items", [])
 
-        # Filter events containing the string "TEST"
+        # Filter events containing the target string
         filtered_events = []
         total_duration_spent = datetime.timedelta()
         total_duration_planned = datetime.timedelta()
@@ -111,7 +111,32 @@ def main():
         average_time_per_week = average_time_per_day * 7
         print(f"Average time spent per day: {average_time_per_day}, per week: {average_time_per_week}")
         
-
+        
+        # Create a pandas DataFrame
+        df = pd.DataFrame(filtered_events)
+        df["start"] = pd.to_datetime(df["start"], utc=True)
+        df["end"] = pd.to_datetime(df["end"], utc=True)
+        df["duration"] = df["end"] - df["start"]
+        df["year_week"] = df["start"].dt.strftime('%Y-%U')
+        
+        # Group by year and week
+        df_grouped = df.groupby("year_week").agg({"duration": "sum"}).reset_index()
+        df_grouped["duration_hours"] = df_grouped["duration"].dt.total_seconds() / 3600
+        
+        # Ensure all weeks are included
+        all_weeks = pd.date_range(start=df["start"].min(), end=df["start"].max(), freq='W-MON').strftime('%Y-%U')
+        df_grouped = df_grouped.set_index("year_week").reindex(all_weeks, fill_value=0).reset_index()
+        df_grouped.columns = ["year_week", "duration", "duration_hours"]
+        
+        # Plot the histogram
+        df_grouped.plot(kind="bar", x="year_week", y="duration_hours", title="Time spent per week")
+        
+        # Show the plot
+        import matplotlib.pyplot as plt
+        plt.xlabel('Year-Week')
+        plt.ylabel('Hours')
+        plt.show()
+        
     except HttpError as error:
         print(f"An error occurred: {error}")
 
