@@ -22,6 +22,62 @@ def main():
     Get all events from the primary calendar containing the target string.
     Note that times are in timezone UTC.
     """
+    creds = get_credentials()
+
+    # Get all events from the primary calendar
+    try:
+        service = build("calendar", "v3", credentials=creds)
+
+        # Call the Calendar API
+        print("Getting all events")
+        events_result = service.events().list(
+            calendarId="primary",
+            q=TARGET_STRING,  # Filter to exact matches of target string
+            timeMin=START_DATE,
+            singleEvents=True,
+            orderBy="startTime",
+            maxResults=2500,
+        ).execute()
+        events = events_result.get("items", [])
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return
+
+    # Filter events containing the target string and calculate total time spent
+    filtered_events = []
+    total_duration_spent = datetime.timedelta()
+    total_duration_planned = datetime.timedelta()
+
+    for event in events:
+        if TARGET_STRING in event.get("summary", ""):
+            start = event["start"].get(
+                "dateTime", event["start"].get("date"))
+            end = event["end"].get("dateTime", event["end"].get("date"))
+            start_dt = datetime.datetime.fromisoformat(start)
+            end_dt = datetime.datetime.fromisoformat(end)
+            duration = end_dt - start_dt
+
+            # Check if the event is in the past or future
+            if end_dt < datetime.datetime.now(datetime.timezone.utc):
+                total_duration_spent += duration
+            else:
+                total_duration_planned += duration
+
+            filtered_events.append({
+                "summary": event["summary"],
+                "start": start,
+                "end": end,
+                "duration": duration
+            })
+
+    # Print the result
+    print_result(filtered_events, total_duration_spent, total_duration_planned)
+
+    # Create a plot to visualize the time spent per week
+    create_plot(filtered_events)
+
+
+def get_credentials():
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
@@ -46,103 +102,68 @@ def main():
         # Save the credentials for the next run
         with open("token.json", "w") as token:
             token.write(creds.to_json())
+    return creds
 
-    try:
-        service = build("calendar", "v3", credentials=creds)
 
-        # Call the Calendar API
-        print("Getting all events")
-        events_result = service.events().list(
-            calendarId="primary",
-            q=TARGET_STRING,
-            timeMin=START_DATE,
-            singleEvents=True,
-            orderBy="startTime",
-            maxResults=2500,     # maximum number of events to return (up to 2500)
-        ).execute()
-        events = events_result.get("items", [])
+def print_result(filtered_events, total_duration_spent, total_duration_planned):
+    # Print filtered events to get a sense of the data
+    df = pd.DataFrame(filtered_events)
+    print(df)
+    # Print total time spent and planned
+    print(
+        f"Total time spent on past events containing '{TARGET_STRING}': {total_duration_spent} (as hours: {total_duration_spent.total_seconds() / 3600:.2f})")
+    print(
+        f"Total time planned for future events containing '{TARGET_STRING}': {total_duration_planned}")
 
-        # Filter events containing the target string
-        filtered_events = []
-        total_duration_spent = datetime.timedelta()
-        total_duration_planned = datetime.timedelta()
+    # Calculate days since first to last event (that already happened)
+    first_timestamp = datetime.datetime.fromisoformat(
+        filtered_events[0]["start"])
+    # get the last event that already happened
+    for event in filtered_events:
+        if datetime.datetime.fromisoformat(event["end"]) < datetime.datetime.now(datetime.timezone.utc):
+            last_timestamp = datetime.datetime.fromisoformat(event["end"])
+    days_since_first = (last_timestamp - first_timestamp).days
+    print(f"Days since first event: {days_since_first}")
+    # Average time spend per day
+    average_time_per_day = total_duration_spent / days_since_first
+    average_time_per_week = average_time_per_day * 7
+    print(
+        f"Average time spent per day: {average_time_per_day}, per week: {average_time_per_week}")
 
-        for event in events:
-            if TARGET_STRING in event.get("summary", ""):
-                start = event["start"].get(
-                    "dateTime", event["start"].get("date"))
-                end = event["end"].get("dateTime", event["end"].get("date"))
-                start_dt = datetime.datetime.fromisoformat(start)
-                end_dt = datetime.datetime.fromisoformat(end)
-                duration = end_dt - start_dt
 
-                # Check if the event is in the past or future
-                if end_dt < datetime.datetime.now(datetime.timezone.utc):
-                    total_duration_spent += duration
-                else:
-                    total_duration_planned += duration
+def create_plot(filtered_events):
+    # Filter all events further than 2 weeks in the future
+    filtered_events = [event for event in filtered_events if datetime.datetime.fromisoformat(
+        event["start"]) < datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(weeks=2)]
 
-                filtered_events.append({
-                    "summary": event["summary"],
-                    "start": start,
-                    "end": end,
-                    "duration": duration
-                })
+    # Create a pandas DataFrame
+    df = pd.DataFrame(filtered_events)
+    df["start"] = pd.to_datetime(df["start"], utc=True)
+    df["end"] = pd.to_datetime(df["end"], utc=True)
+    df["duration"] = df["end"] - df["start"]
+    df["year_week"] = df["start"].dt.strftime('%Y-%U')
 
-                # Create a pandas DataFrame
-        df = pd.DataFrame(filtered_events)
-        print(df)
-        
-        print(
-    f"Total time spent on past events containing '{TARGET_STRING}': {total_duration_spent} (as hours: {total_duration_spent.total_seconds() / 3600:.2f})")
-        print(
-            f"Total time planned for future events containing '{TARGET_STRING}': {total_duration_planned}")
-        
-        # Calculate days since first to last event (that already happened)
-        first_timestamp = datetime.datetime.fromisoformat(filtered_events[0]["start"])
-        # get the last event that already happened
-        for event in filtered_events:
-            if datetime.datetime.fromisoformat(event["end"]) < datetime.datetime.now(datetime.timezone.utc):
-                last_timestamp = datetime.datetime.fromisoformat(event["end"])
-        days_since_first = (last_timestamp - first_timestamp).days
-        print(f"Days since first event: {days_since_first}")
-        # Average time spend per day
-        average_time_per_day = total_duration_spent / days_since_first
-        average_time_per_week = average_time_per_day * 7
-        print(f"Average time spent per day: {average_time_per_day}, per week: {average_time_per_week}")
-        
-        
-        # Create plot:
-        # Filter all events further than 2 weeks in the future
-        filtered_events = [event for event in filtered_events if datetime.datetime.fromisoformat(event["start"]) < datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(weeks=2)]
-        
-        # Create a pandas DataFrame
-        df = pd.DataFrame(filtered_events)
-        df["start"] = pd.to_datetime(df["start"], utc=True)
-        df["end"] = pd.to_datetime(df["end"], utc=True)
-        df["duration"] = df["end"] - df["start"]
-        df["year_week"] = df["start"].dt.strftime('%Y-%U')
-        
-        # Group by year and week
-        df_grouped = df.groupby("year_week").agg({"duration": "sum"}).reset_index()
-        df_grouped["duration_hours"] = df_grouped["duration"].dt.total_seconds() / 3600
-        
-        # Ensure all weeks are included
-        all_weeks = pd.date_range(start=df["start"].min(), end=df["start"].max(), freq='W-MON').strftime('%Y-%U')
-        df_grouped = df_grouped.set_index("year_week").reindex(all_weeks, fill_value=0).reset_index()
-        df_grouped.columns = ["year_week", "duration", "duration_hours"]
-        
-        # Plot the histogram
-        df_grouped.plot(kind="bar", x="year_week", y="duration_hours", title="Time spent per week")
-        
-        # Show the plot
-        import matplotlib.pyplot as plt
-        plt.xlabel('Year-Week')
-        plt.ylabel('Hours')
-        plt.show()
-        
-    except HttpError as error:
-        print(f"An error occurred: {error}")
+    # Group by year and week
+    df_grouped = df.groupby("year_week").agg({"duration": "sum"}).reset_index()
+    df_grouped["duration_hours"] = df_grouped["duration"].dt.total_seconds() / \
+        3600
+
+    # Ensure all weeks are included
+    all_weeks = pd.date_range(start=df["start"].min(
+    ), end=df["start"].max(), freq='W-MON').strftime('%Y-%U')
+    df_grouped = df_grouped.set_index("year_week").reindex(
+        all_weeks, fill_value=0).reset_index()
+    df_grouped.columns = ["year_week", "duration", "duration_hours"]
+
+    # Plot the histogram
+    df_grouped.plot(kind="bar", x="year_week",
+                    y="duration_hours", title="Time spent per week")
+
+    # Show the plot
+    import matplotlib.pyplot as plt
+    plt.xlabel('Year-Week')
+    plt.ylabel('Hours')
+    plt.show()
 
 
 if __name__ == "__main__":
