@@ -112,6 +112,10 @@ def main():
         print(f"Average time spent per day: {average_time_per_day}, per week: {average_time_per_week}")
         
         
+        # Create plot:
+        # Filter all events further than 2 weeks in the future
+        filtered_events = [event for event in filtered_events if datetime.datetime.fromisoformat(event["start"]) < datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(weeks=2)]
+        
         # Create a pandas DataFrame
         df = pd.DataFrame(filtered_events)
         df["start"] = pd.to_datetime(df["start"], utc=True)
