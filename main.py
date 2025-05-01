@@ -1,6 +1,8 @@
 import datetime
 import os.path
 import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -13,8 +15,10 @@ from googleapiclient.errors import HttpError
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
-TARGET_STRING = "InnoTA"
-START_DATE = '2023-09-29T00:00:00Z'  # Start date in RFC3339 format
+# TARGET_STRING = "InnoTA"
+TARGET_STRING = "PA"
+# START_DATE = '2023-09-29T00:00:00Z'  # Start date in RFC3339 format
+START_DATE = '2024-03-12T00:00:00Z'  # Start date in RFC3339 format
 
 
 def main():
@@ -156,11 +160,21 @@ def create_plot(filtered_events):
     df_grouped.columns = ["year_week", "duration", "duration_hours"]
 
     # Plot the histogram
+    fig, ax = plt.subplots(figsize=(12, 6.5)) 
     df_grouped.plot(kind="bar", x="year_week",
-                    y="duration_hours", title="Time spent per week")
+                    y="duration_hours", title="Time spent per week",
+                    color='red',
+                    ax=ax)
+    # Set labels on axes to be more readable
+    plt.xlabel("Year-Week")
+    plt.ylabel("Hours")
+
+    # Save as high quality image (pref SVG) with legible font size
+    matplotlib.rcParams.update({'font.size': 12})
+    plt.savefig('time_spent_per_week.svg', format='svg',
+                dpi=1200)
 
     # Show the plot
-    import matplotlib.pyplot as plt
     plt.xlabel('Year-Week')
     plt.ylabel('Hours')
     plt.show()
